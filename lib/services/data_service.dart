@@ -3,186 +3,157 @@ import '../models/bank_transaction.dart';
 import 'secure_database_service.dart';
 
 class DataService {
-  // Cache for dropdown options to provide synchronous access
-  static List<String> _cachedJobs = [];
-  static List<String> _cachedAccounts = [];
-  static List<String> _cachedCashBank = [];
-  static List<String> _cachedParties = [];
+  static const String _isInitializedKey = 'app_initialized';
 
-  // Initialize data - load from secure database
-  static Future<void> initializeData() async {
-    await SecureDatabaseService.initialize();
-    await _loadAllDropdownCache();
+  // Initialize default data ONLY on first run - using secure storage only
+  static Future<void> initializeDefaultData() async {
+    // Check initialization status from secure storage instead of SharedPreferences
+    bool isInitialized = await SecureDatabaseService.isAppInitialized();
+    
+    print("Checking initialization status: $isInitialized");
+    
+    if (!isInitialized) {
+      print("First time run - initializing secure database");
+      
+      // Initialize secure database with default data
+      await SecureDatabaseService.initialize();
+      
+      // Mark as initialized in secure storage
+      await SecureDatabaseService.setAppInitialized(true);
+      print("Secure database initialized successfully");
+    } else {
+      print("App already initialized - using existing secure database");
+      // Just initialize the database connection
+      await SecureDatabaseService.initialize();
+    }
   }
 
-  // Load all dropdown data into cache
-  static Future<void> _loadAllDropdownCache() async {
-    _cachedJobs = await SecureDatabaseService.getDropdownOptions('Job');
-    _cachedAccounts = await SecureDatabaseService.getDropdownOptions('Account');
-    _cachedCashBank = await SecureDatabaseService.getDropdownOptions('Cash/Bank');
-    _cachedParties = await SecureDatabaseService.getDropdownOptions('Party');
+  // Jobs CRUD Operations
+  static Future<List<String>> getJobs() async {
+    return await SecureDatabaseService.getJobs();
   }
 
-  // Synchronous getters for dropdown options (using cache)
-  static List<String> getJobs() => List.from(_cachedJobs);
-  static List<String> getAccounts() => List.from(_cachedAccounts);
-  static List<String> getCashBank() => List.from(_cachedCashBank);
-  static List<String> getParties() => List.from(_cachedParties);
-
-  // Async getters for fresh data (when needed)
-  static Future<List<String>> getJobsAsync() async {
-    _cachedJobs = await SecureDatabaseService.getDropdownOptions('Job');
-    return List.from(_cachedJobs);
+  static Future<bool> addJob(String job) async {
+    return await SecureDatabaseService.addJob(job);
   }
 
-  static Future<List<String>> getAccountsAsync() async {
-    _cachedAccounts = await SecureDatabaseService.getDropdownOptions('Account');
-    return List.from(_cachedAccounts);
+  static Future<bool> deleteJob(String job) async {
+    return await SecureDatabaseService.deleteJob(job);
   }
 
-  static Future<List<String>> getCashBankAsync() async {
-    _cachedCashBank = await SecureDatabaseService.getDropdownOptions('Cash/Bank');
-    return List.from(_cachedCashBank);
+  // Accounts CRUD Operations
+  static Future<List<String>> getAccounts() async {
+    return await SecureDatabaseService.getAccounts();
   }
 
-  static Future<List<String>> getPartiesAsync() async {
-    _cachedParties = await SecureDatabaseService.getDropdownOptions('Party');
-    return List.from(_cachedParties);
+  static Future<bool> addAccount(String account) async {
+    return await SecureDatabaseService.addAccount(account);
   }
 
-  // Expense/Income Record methods
-  static Future<void> saveExpenseIncomeRecord(ExpenseIncomeRecord record) async {
-    await SecureDatabaseService.saveExpenseIncomeRecord(record);
+  static Future<bool> deleteAccount(String account) async {
+    return await SecureDatabaseService.deleteAccount(account);
   }
 
+  // Cash/Bank CRUD Operations
+  static Future<List<String>> getCashBank() async {
+    return await SecureDatabaseService.getCashBank();
+  }
+
+  static Future<bool> addCashBank(String cashBank) async {
+    return await SecureDatabaseService.addCashBank(cashBank);
+  }
+
+  static Future<bool> deleteCashBank(String cashBank) async {
+    return await SecureDatabaseService.deleteCashBank(cashBank);
+  }
+
+  // Party CRUD Operations
+  static Future<List<String>> getParty() async {
+    return await SecureDatabaseService.getParty();
+  }
+
+  static Future<bool> addParty(String party) async {
+    return await SecureDatabaseService.addParty(party);
+  }
+
+  static Future<bool> deleteParty(String party) async {
+    return await SecureDatabaseService.deleteParty(party);
+  }
+
+  // Expense Income Records CRUD
   static Future<List<ExpenseIncomeRecord>> getExpenseIncomeRecords() async {
     return await SecureDatabaseService.getExpenseIncomeRecords();
   }
 
-  // Bank Transaction methods
-  static Future<void> saveBankTransaction(BankTransaction transaction) async {
-    await SecureDatabaseService.saveBankTransaction(transaction);
+  static Future<bool> addExpenseIncomeRecord(ExpenseIncomeRecord record) async {
+    return await SecureDatabaseService.addExpenseIncomeRecord(record);
   }
 
-  static Future<List<BankTransaction>> getBankTransactionsByBank(String bankName) async {
-    return await SecureDatabaseService.getBankTransactionsByBank(bankName);
+  static Future<bool> deleteExpenseIncomeRecord(String id) async {
+    return await SecureDatabaseService.deleteExpenseIncomeRecord(id);
   }
 
-  static Future<double> getBankBalance(String bankName) async {
-    return await SecureDatabaseService.getBankBalance(bankName);
+  // Bank Transactions CRUD
+  static Future<List<BankTransaction>> getBankTransactions() async {
+    return await SecureDatabaseService.getBankTransactions();
   }
 
-  static Future<List<String>> getBanksWithTransactions() async {
-    return await SecureDatabaseService.getBanksWithTransactions();
+  static Future<bool> addBankTransaction(BankTransaction transaction) async {
+    return await SecureDatabaseService.addBankTransaction(transaction);
   }
 
-  // Add methods for dropdown options
-  static Future<void> addJob(String job) async {
-    if (!_cachedJobs.contains(job)) {
-      await SecureDatabaseService.addDropdownOption('Job', job);
-      _cachedJobs.add(job);
-    }
+  static Future<bool> deleteBankTransaction(String id) async {
+    return await SecureDatabaseService.deleteBankTransaction(id);
   }
 
-  static Future<void> addAccount(String account) async {
-    if (!_cachedAccounts.contains(account)) {
-      await SecureDatabaseService.addDropdownOption('Account', account);
-      _cachedAccounts.add(account);
-    }
+  // Utility Methods - Now fully secure
+  static Future<bool> isAppInitialized() async {
+    return await SecureDatabaseService.isAppInitialized();
   }
 
-  static Future<void> addCashBank(String cashBank) async {
-    if (!_cachedCashBank.contains(cashBank)) {
-      await SecureDatabaseService.addDropdownOption('Cash/Bank', cashBank);
-      _cachedCashBank.add(cashBank);
-    }
+  static Future<void> resetInitialization() async {
+    await SecureDatabaseService.setAppInitialized(false);
+    await SecureDatabaseService.clearAllData();
+    print("Initialization reset - all data cleared from secure storage");
   }
 
-  static Future<void> addParty(String party) async {
-    if (!_cachedParties.contains(party)) {
-      await SecureDatabaseService.addDropdownOption('Party', party);
-      _cachedParties.add(party);
-    }
-  }
-
-  // Edit methods for dropdown options
-  static Future<void> editJob(int index, String newJob) async {
-    if (index >= 0 && index < _cachedJobs.length) {
-      final oldJob = _cachedJobs[index];
-      await SecureDatabaseService.updateDropdownOption('Job', oldJob, newJob);
-      _cachedJobs[index] = newJob;
-    }
-  }
-
-  static Future<void> editAccount(int index, String newAccount) async {
-    if (index >= 0 && index < _cachedAccounts.length) {
-      final oldAccount = _cachedAccounts[index];
-      await SecureDatabaseService.updateDropdownOption('Account', oldAccount, newAccount);
-      _cachedAccounts[index] = newAccount;
-    }
-  }
-
-  static Future<void> editCashBank(int index, String newCashBank) async {
-    if (index >= 0 && index < _cachedCashBank.length) {
-      final oldCashBank = _cachedCashBank[index];
-      await SecureDatabaseService.updateDropdownOption('Cash/Bank', oldCashBank, newCashBank);
-      _cachedCashBank[index] = newCashBank;
-    }
-  }
-
-  static Future<void> editParty(int index, String newParty) async {
-    if (index >= 0 && index < _cachedParties.length) {
-      final oldParty = _cachedParties[index];
-      await SecureDatabaseService.updateDropdownOption('Party', oldParty, newParty);
-      _cachedParties[index] = newParty;
-    }
-  }
-
-  // Remove methods for dropdown options
-  static Future<void> removeJob(int index) async {
-    if (index >= 0 && index < _cachedJobs.length) {
-      final job = _cachedJobs[index];
-      await SecureDatabaseService.deleteDropdownOption('Job', job);
-      _cachedJobs.removeAt(index);
-    }
-  }
-
-  static Future<void> removeAccount(int index) async {
-    if (index >= 0 && index < _cachedAccounts.length) {
-      final account = _cachedAccounts[index];
-      await SecureDatabaseService.deleteDropdownOption('Account', account);
-      _cachedAccounts.removeAt(index);
-    }
-  }
-
-  static Future<void> removeCashBank(int index) async {
-    if (index >= 0 && index < _cachedCashBank.length) {
-      final cashBank = _cachedCashBank[index];
-      await SecureDatabaseService.deleteDropdownOption('Cash/Bank', cashBank);
-      _cachedCashBank.removeAt(index);
-    }
-  }
-
-  static Future<void> removeParty(int index) async {
-    if (index >= 0 && index < _cachedParties.length) {
-      final party = _cachedParties[index];
-      await SecureDatabaseService.deleteDropdownOption('Party', party);
-      _cachedParties.removeAt(index);
-    }
-  }
-
-  // Category name management
-  static Future<void> saveCategoryName(String categoryKey, String displayName) async {
-    await SecureDatabaseService.saveCategoryName(categoryKey, displayName);
-  }
-
-  static Future<String?> getCategoryName(String categoryKey) async {
-    return await SecureDatabaseService.getCategoryName(categoryKey);
-  }
-
-  // Clear all data
   static Future<void> clearAllData() async {
     await SecureDatabaseService.clearAllData();
-    await _loadAllDropdownCache();
+    await SecureDatabaseService.setAppInitialized(false);
+    print("All data cleared from secure storage");
+  }
+
+  // Debug method
+  static Future<void> debugPrintAllData() async {
+    print("=== DEBUG: All Stored Secure Data ===");
+    print("Is Initialized: ${await isAppInitialized()}");
+    print("Jobs: ${await getJobs()}");
+    print("Accounts: ${await getAccounts()}");
+    print("Cash/Bank: ${await getCashBank()}");
+    print("Party: ${await getParty()}");
+    
+    final expenseRecords = await getExpenseIncomeRecords();
+    print("Expense/Income Records: ${expenseRecords.length} items");
+    
+    final bankTransactions = await getBankTransactions();
+    print("Bank Transactions: ${bankTransactions.length} items");
+    print("=====================================");
+  }
+
+  // Backward compatibility methods (for existing code that uses index-based deletion)
+  static Future<bool> deleteExpenseIncomeRecordByIndex(int index) async {
+    final records = await getExpenseIncomeRecords();
+    if (index >= 0 && index < records.length) {
+      return await deleteExpenseIncomeRecord(records[index].id);
+    }
+    return false;
+  }
+
+  static Future<bool> deleteBankTransactionByIndex(int index) async {
+    final transactions = await getBankTransactions();
+    if (index >= 0 && index < transactions.length) {
+      return await deleteBankTransaction(transactions[index].id);
+    }
+    return false;
   }
 }

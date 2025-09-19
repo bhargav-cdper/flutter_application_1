@@ -3,13 +3,17 @@ import 'screens/login_screen.dart';
 import 'services/data_service.dart';
 
 void main() async {
+  // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
-  await DataService.initializeData();
-  runApp(ExpenseManagementApp());
+  
+  // Initialize default data only on first run
+  await DataService.initializeDefaultData();
+  
+  runApp(const ExpenseManagementApp());
 }
 
 class ExpenseManagementApp extends StatelessWidget {
-  const ExpenseManagementApp({Key? key}) : super(key: key);
+  const ExpenseManagementApp({super.key});
 
   @override
   Widget build(BuildContext context) {

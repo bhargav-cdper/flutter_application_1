@@ -1,354 +1,398 @@
-import 'dart:io';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart';
-import 'package:crypto/crypto.dart';
 import '../models/expense_income_record.dart';
 import '../models/bank_transaction.dart';
 
 class SecureDatabaseService {
-  static Database? _database;
-  static const String _databaseName = 'expense_management_secure.db';
-  static const int _databaseVersion = 1;
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+    ),
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock_this_device,
+    ),
+    lOptions: LinuxOptions(),
+    wOptions: WindowsOptions(),
+  );
 
-  // Initialize database
+  // Storage Keys
+  static const String _appInitializedKey = 'app_initialized';
+  static const String _jobsKey = 'secure_jobs';
+  static const String _accountsKey = 'secure_accounts';
+  static const String _cashBankKey = 'secure_cash_bank';
+  static const String _partyKey = 'secure_party';
+  static const String _expenseRecordsKey = 'secure_expense_records';
+  static const String _bankTransactionsKey = 'secure_bank_transactions';
+
+  // Initialize the database with default data
   static Future<void> initialize() async {
-    // Initialize ffi loader for desktop platforms
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      sqfliteFfiInit();
-      databaseFactory = databaseFactoryFfi;
+    try {
+      bool isInitialized = await isAppInitialized();
+      
+      if (!isInitialized) {
+        print("Initializing secure database with default data...");
+        await _loadDefaultData();
+        await setAppInitialized(true);
+        print("Secure database initialized successfully");
+      } else {
+        print("Secure database already initialized");
+      }
+    } catch (e) {
+      print("Error initializing secure database: $e");
     }
-
-    await _initDatabase();
-    await _createTables();
   }
 
-  static Future<void> _initDatabase() async {
-    final documentsDirectory = await getApplicationDocumentsDirectory();
-    final dbDirectory = Directory(join(documentsDirectory.path, 'ExpenseManagement'));
+  // Load default data
+  static Future<void> _loadDefaultData() async {
+    // Default Jobs
+    List<String> defaultJobs = [
+      'Software Development',
+      'Marketing',
+      'Sales',
+      'HR Management',
+      'Accounting',
+      'Design',
+      'Consulting'
+    ];
+
+    // Default Accounts
+    List<String> defaultAccounts = [
+      'Business Account',
+      'Personal Account',
+      'Savings Account',
+      'Investment Account',
+      'Expense Account'
+    ];
+
+    // Default Cash/Bank options
+    List<String> defaultCashBank = [
+      'Cash',
+      'SBI Bank',
+      'HDFC Bank',
+      'ICICI Bank',
+      'Axis Bank',
+      'Kotak Bank',
+      'PayTM Wallet',
+      'PhonePe Wallet'
+    ];
+
+    // Default Parties
+    List<String> defaultParties = [
+      'Client A',
+      'Client B',
+      'Vendor 1',
+      'Vendor 2',
+      'Employee 1',
+      'Employee 2',
+      'Contractor'
+    ];
+
+    // Save default data
+    await _writeSecureList(_jobsKey, defaultJobs);
+    await _writeSecureList(_accountsKey, defaultAccounts);
+    await _writeSecureList(_cashBankKey, defaultCashBank);
+    await _writeSecureList(_partyKey, defaultParties);
     
-    // Create directory if it doesn't exist
-    if (!await dbDirectory.exists()) {
-      await dbDirectory.create(recursive: true);
+    // Initialize empty records
+    await _secureStorage.write(key: _expenseRecordsKey, value: jsonEncode([]));
+    await _secureStorage.write(key: _bankTransactionsKey, value: jsonEncode([]));
+  }
+
+  // App Initialization Methods
+  static Future<bool> isAppInitialized() async {
+    try {
+      String? value = await _secureStorage.read(key: _appInitializedKey);
+      return value == 'true';
+    } catch (e) {
+      print('Error checking app initialization: $e');
+      return false;
     }
-
-    final path = join(dbDirectory.path, _databaseName);
-    
-    _database = await openDatabase(
-      path,
-      version: _databaseVersion,
-      onCreate: (db, version) async {
-        await _createTables();
-      },
-    );
   }
 
-  static Future<void> _createTables() async {
-    if (_database == null) return;
-
-    // Create dropdown options table
-    await _database!.execute('''
-      CREATE TABLE IF NOT EXISTS dropdown_options (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        category TEXT NOT NULL,
-        value TEXT NOT NULL,
-        created_at TEXT NOT NULL
-      )
-    ''');
-
-    // Create expense income records table
-    await _database!.execute('''
-      CREATE TABLE IF NOT EXISTS expense_income_records (
-        id TEXT PRIMARY KEY,
-        cash_bank TEXT NOT NULL,
-        date TEXT NOT NULL,
-        job TEXT NOT NULL,
-        details TEXT NOT NULL,
-        unit TEXT,
-        qty REAL NOT NULL DEFAULT 0,
-        rate REAL NOT NULL DEFAULT 0,
-        credit REAL NOT NULL DEFAULT 0,
-        debit REAL NOT NULL DEFAULT 0,
-        net_amount REAL NOT NULL DEFAULT 0,
-        account TEXT,
-        staff_personal_party TEXT,
-        created_at TEXT NOT NULL
-      )
-    ''');
-
-    // Create bank transactions table
-    await _database!.execute('''
-      CREATE TABLE IF NOT EXISTS bank_transactions (
-        id TEXT PRIMARY KEY,
-        date TEXT NOT NULL,
-        description TEXT NOT NULL,
-        credit REAL NOT NULL DEFAULT 0,
-        debit REAL NOT NULL DEFAULT 0,
-        net_balance REAL NOT NULL DEFAULT 0,
-        party TEXT,
-        salary_loan_month TEXT,
-        bank_name TEXT NOT NULL,
-        created_at TEXT NOT NULL
-      )
-    ''');
-
-    // Create category names table for custom category titles
-    await _database!.execute('''
-      CREATE TABLE IF NOT EXISTS category_names (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        category_key TEXT UNIQUE NOT NULL,
-        display_name TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      )
-    ''');
-
-    // Insert default dropdown options if not exists
-    await _insertDefaultOptions();
-  }
-
-  static Future<void> _insertDefaultOptions() async {
-    if (_database == null) return;
-
-    final now = DateTime.now().toIso8601String();
-
-    // Default jobs
-    final defaultJobs = ['Construction', 'Renovation', 'Maintenance', 'Consultation'];
-    for (String job in defaultJobs) {
-      await _database!.rawInsert(
-        'INSERT OR IGNORE INTO dropdown_options (category, value, created_at) VALUES (?, ?, ?)',
-        ['Job', job, now],
+  static Future<void> setAppInitialized(bool initialized) async {
+    try {
+      await _secureStorage.write(
+        key: _appInitializedKey, 
+        value: initialized.toString()
       );
-    }
-
-    // Default accounts
-    final defaultAccounts = ['Office Expenses', 'Material Cost', 'Labor Cost', 'Transport'];
-    for (String account in defaultAccounts) {
-      await _database!.rawInsert(
-        'INSERT OR IGNORE INTO dropdown_options (category, value, created_at) VALUES (?, ?, ?)',
-        ['Account', account, now],
-      );
-    }
-
-    // Default cash/bank options
-    final defaultCashBank = ['Cash', 'SBI Bank', 'HDFC Bank', 'ICICI Bank'];
-    for (String cashBank in defaultCashBank) {
-      await _database!.rawInsert(
-        'INSERT OR IGNORE INTO dropdown_options (category, value, created_at) VALUES (?, ?, ?)',
-        ['Cash/Bank', cashBank, now],
-      );
-    }
-
-    // Default parties
-    final defaultParties = ['ABC Suppliers', 'XYZ Contractors', 'PQR Materials', 'Staff Salary'];
-    for (String party in defaultParties) {
-      await _database!.rawInsert(
-        'INSERT OR IGNORE INTO dropdown_options (category, value, created_at) VALUES (?, ?, ?)',
-        ['Party', party, now],
-      );
+    } catch (e) {
+      print('Error setting app initialization: $e');
     }
   }
 
-  // Dropdown options methods
-  static Future<List<String>> getDropdownOptions(String category) async {
-    if (_database == null) return [];
-
-    final List<Map<String, dynamic>> results = await _database!.query(
-      'dropdown_options',
-      where: 'category = ?',
-      whereArgs: [category],
-      orderBy: 'id ASC',
-    );
-
-    return results.map((row) => row['value'] as String).toList();
+  // Helper Methods for List Operations
+  static Future<List<String>> _readSecureList(String key) async {
+    try {
+      String? data = await _secureStorage.read(key: key);
+      if (data != null && data.isNotEmpty) {
+        List<dynamic> decoded = jsonDecode(data);
+        return decoded.cast<String>();
+      }
+      return [];
+    } catch (e) {
+      print('Error reading secure list for key $key: $e');
+      return [];
+    }
   }
 
-  static Future<void> addDropdownOption(String category, String value) async {
-    if (_database == null) return;
-
-    await _database!.insert('dropdown_options', {
-      'category': category,
-      'value': value,
-      'created_at': DateTime.now().toIso8601String(),
-    });
+  static Future<void> _writeSecureList(String key, List<String> list) async {
+    try {
+      await _secureStorage.write(key: key, value: jsonEncode(list));
+    } catch (e) {
+      print('Error writing secure list for key $key: $e');
+    }
   }
 
-  static Future<void> updateDropdownOption(String category, String oldValue, String newValue) async {
-    if (_database == null) return;
-
-    await _database!.update(
-      'dropdown_options',
-      {'value': newValue},
-      where: 'category = ? AND value = ?',
-      whereArgs: [category, oldValue],
-    );
+  // Jobs CRUD Operations
+  static Future<List<String>> getJobs() async {
+    return await _readSecureList(_jobsKey);
   }
 
-  static Future<void> deleteDropdownOption(String category, String value) async {
-    if (_database == null) return;
-
-    await _database!.delete(
-      'dropdown_options',
-      where: 'category = ? AND value = ?',
-      whereArgs: [category, value],
-    );
+  static Future<bool> addJob(String job) async {
+    try {
+      List<String> jobs = await getJobs();
+      if (!jobs.contains(job)) {
+        jobs.add(job);
+        await _writeSecureList(_jobsKey, jobs);
+        return true;
+      }
+      return false; // Already exists
+    } catch (e) {
+      print('Error adding job: $e');
+      return false;
+    }
   }
 
-  // Expense Income Records methods
-  static Future<void> saveExpenseIncomeRecord(ExpenseIncomeRecord record) async {
-    if (_database == null) return;
-
-    await _database!.insert('expense_income_records', {
-      'id': record.id,
-      'cash_bank': record.cashBank,
-      'date': record.date.toIso8601String(),
-      'job': record.job,
-      'details': record.details,
-      'unit': record.unit,
-      'qty': record.qty,
-      'rate': record.rate,
-      'credit': record.credit,
-      'debit': record.debit,
-      'net_amount': record.netAmount,
-      'account': record.account,
-      'staff_personal_party': record.staffPersonalParty,
-      'created_at': DateTime.now().toIso8601String(),
-    });
+  static Future<bool> deleteJob(String job) async {
+    try {
+      List<String> jobs = await getJobs();
+      if (jobs.contains(job)) {
+        jobs.remove(job);
+        await _writeSecureList(_jobsKey, jobs);
+        return true;
+      }
+      return false; // Not found
+    } catch (e) {
+      print('Error deleting job: $e');
+      return false;
+    }
   }
 
+  // Accounts CRUD Operations
+  static Future<List<String>> getAccounts() async {
+    return await _readSecureList(_accountsKey);
+  }
+
+  static Future<bool> addAccount(String account) async {
+    try {
+      List<String> accounts = await getAccounts();
+      if (!accounts.contains(account)) {
+        accounts.add(account);
+        await _writeSecureList(_accountsKey, accounts);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('Error adding account: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> deleteAccount(String account) async {
+    try {
+      List<String> accounts = await getAccounts();
+      if (accounts.contains(account)) {
+        accounts.remove(account);
+        await _writeSecureList(_accountsKey, accounts);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('Error deleting account: $e');
+      return false;
+    }
+  }
+
+  // Cash/Bank CRUD Operations
+  static Future<List<String>> getCashBank() async {
+    return await _readSecureList(_cashBankKey);
+  }
+
+  static Future<bool> addCashBank(String cashBank) async {
+    try {
+      List<String> cashBankList = await getCashBank();
+      if (!cashBankList.contains(cashBank)) {
+        cashBankList.add(cashBank);
+        await _writeSecureList(_cashBankKey, cashBankList);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('Error adding cash/bank: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> deleteCashBank(String cashBank) async {
+    try {
+      List<String> cashBankList = await getCashBank();
+      if (cashBankList.contains(cashBank)) {
+        cashBankList.remove(cashBank);
+        await _writeSecureList(_cashBankKey, cashBankList);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('Error deleting cash/bank: $e');
+      return false;
+    }
+  }
+
+  // Party CRUD Operations
+  static Future<List<String>> getParty() async {
+    return await _readSecureList(_partyKey);
+  }
+
+  static Future<bool> addParty(String party) async {
+    try {
+      List<String> parties = await getParty();
+      if (!parties.contains(party)) {
+        parties.add(party);
+        await _writeSecureList(_partyKey, parties);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('Error adding party: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> deleteParty(String party) async {
+    try {
+      List<String> parties = await getParty();
+      if (parties.contains(party)) {
+        parties.remove(party);
+        await _writeSecureList(_partyKey, parties);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('Error deleting party: $e');
+      return false;
+    }
+  }
+
+  // Expense Income Records CRUD
   static Future<List<ExpenseIncomeRecord>> getExpenseIncomeRecords() async {
-    if (_database == null) return [];
-
-    final List<Map<String, dynamic>> results = await _database!.query(
-      'expense_income_records',
-      orderBy: 'created_at DESC',
-    );
-
-    return results.map((row) => ExpenseIncomeRecord(
-      id: row['id'],
-      cashBank: row['cash_bank'],
-      date: DateTime.parse(row['date']),
-      job: row['job'],
-      details: row['details'],
-      unit: row['unit'] ?? '',
-      qty: row['qty']?.toDouble() ?? 0.0,
-      rate: row['rate']?.toDouble() ?? 0.0,
-      credit: row['credit']?.toDouble() ?? 0.0,
-      debit: row['debit']?.toDouble() ?? 0.0,
-      netAmount: row['net_amount']?.toDouble() ?? 0.0,
-      account: row['account'] ?? '',
-      staffPersonalParty: row['staff_personal_party'] ?? '',
-    )).toList();
-  }
-
-  // Bank Transaction methods
-  static Future<void> saveBankTransaction(BankTransaction transaction) async {
-    if (_database == null) return;
-
-    await _database!.insert('bank_transactions', {
-      'id': transaction.id,
-      'date': transaction.date.toIso8601String(),
-      'description': transaction.description,
-      'credit': transaction.credit,
-      'debit': transaction.debit,
-      'net_balance': transaction.netBalance,
-      'party': transaction.party,
-      'salary_loan_month': transaction.salaryLoanMonth,
-      'bank_name': transaction.bankName,
-      'created_at': DateTime.now().toIso8601String(),
-    });
-  }
-
-  static Future<List<BankTransaction>> getBankTransactionsByBank(String bankName) async {
-    if (_database == null) return [];
-
-    final List<Map<String, dynamic>> results = await _database!.query(
-      'bank_transactions',
-      where: 'bank_name = ?',
-      whereArgs: [bankName],
-      orderBy: 'created_at DESC',
-    );
-
-    return results.map((row) => BankTransaction(
-      id: row['id'],
-      date: DateTime.parse(row['date']),
-      description: row['description'],
-      credit: row['credit']?.toDouble() ?? 0.0,
-      debit: row['debit']?.toDouble() ?? 0.0,
-      netBalance: row['net_balance']?.toDouble() ?? 0.0,
-      party: row['party'] ?? '',
-      salaryLoanMonth: row['salary_loan_month'] ?? '',
-      bankName: row['bank_name'],
-    )).toList();
-  }
-
-  static Future<List<String>> getBanksWithTransactions() async {
-    if (_database == null) return [];
-
-    final List<Map<String, dynamic>> results = await _database!.rawQuery(
-      'SELECT DISTINCT bank_name FROM bank_transactions WHERE bank_name IS NOT NULL AND bank_name != ""',
-    );
-
-    return results.map((row) => row['bank_name'] as String).toList();
-  }
-
-  static Future<double> getBankBalance(String bankName) async {
-    if (_database == null) return 0.0;
-
-    final List<Map<String, dynamic>> results = await _database!.rawQuery(
-      'SELECT SUM(credit - debit) as balance FROM bank_transactions WHERE bank_name = ?',
-      [bankName],
-    );
-
-    if (results.isNotEmpty && results.first['balance'] != null) {
-      return results.first['balance'].toDouble();
+    try {
+      String? data = await _secureStorage.read(key: _expenseRecordsKey);
+      if (data != null && data.isNotEmpty) {
+        List<dynamic> decoded = jsonDecode(data);
+        return decoded.map((item) => ExpenseIncomeRecord.fromJson(item)).toList();
+      }
+      return [];
+    } catch (e) {
+      print('Error getting expense income records: $e');
+      return [];
     }
-    return 0.0;
   }
 
-  // Category names methods
-  static Future<void> saveCategoryName(String categoryKey, String displayName) async {
-    if (_database == null) return;
-
-    await _database!.rawInsert(
-      'INSERT OR REPLACE INTO category_names (category_key, display_name, updated_at) VALUES (?, ?, ?)',
-      [categoryKey, displayName, DateTime.now().toIso8601String()],
-    );
-  }
-
-  static Future<String?> getCategoryName(String categoryKey) async {
-    if (_database == null) return null;
-
-    final List<Map<String, dynamic>> results = await _database!.query(
-      'category_names',
-      where: 'category_key = ?',
-      whereArgs: [categoryKey],
-    );
-
-    if (results.isNotEmpty) {
-      return results.first['display_name'];
+  static Future<bool> addExpenseIncomeRecord(ExpenseIncomeRecord record) async {
+    try {
+      List<ExpenseIncomeRecord> records = await getExpenseIncomeRecords();
+      records.add(record);
+      
+      List<Map<String, dynamic>> jsonList = records.map((r) => r.toJson()).toList();
+      await _secureStorage.write(key: _expenseRecordsKey, value: jsonEncode(jsonList));
+      return true;
+    } catch (e) {
+      print('Error adding expense income record: $e');
+      return false;
     }
-    return null;
   }
 
-  // Clear all data (for reset/logout)
+  static Future<bool> deleteExpenseIncomeRecord(String id) async {
+    try {
+      List<ExpenseIncomeRecord> records = await getExpenseIncomeRecords();
+      records.removeWhere((record) => record.id == id);
+      
+      List<Map<String, dynamic>> jsonList = records.map((r) => r.toJson()).toList();
+      await _secureStorage.write(key: _expenseRecordsKey, value: jsonEncode(jsonList));
+      return true;
+    } catch (e) {
+      print('Error deleting expense income record: $e');
+      return false;
+    }
+  }
+
+  // Bank Transactions CRUD
+  static Future<List<BankTransaction>> getBankTransactions() async {
+    try {
+      String? data = await _secureStorage.read(key: _bankTransactionsKey);
+      if (data != null && data.isNotEmpty) {
+        List<dynamic> decoded = jsonDecode(data);
+        return decoded.map((item) => BankTransaction.fromJson(item)).toList();
+      }
+      return [];
+    } catch (e) {
+      print('Error getting bank transactions: $e');
+      return [];
+    }
+  }
+
+  static Future<bool> addBankTransaction(BankTransaction transaction) async {
+    try {
+      List<BankTransaction> transactions = await getBankTransactions();
+      transactions.add(transaction);
+      
+      List<Map<String, dynamic>> jsonList = transactions.map((t) => t.toJson()).toList();
+      await _secureStorage.write(key: _bankTransactionsKey, value: jsonEncode(jsonList));
+      return true;
+    } catch (e) {
+      print('Error adding bank transaction: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> deleteBankTransaction(String id) async {
+    try {
+      List<BankTransaction> transactions = await getBankTransactions();
+      transactions.removeWhere((transaction) => transaction.id == id);
+      
+      List<Map<String, dynamic>> jsonList = transactions.map((t) => t.toJson()).toList();
+      await _secureStorage.write(key: _bankTransactionsKey, value: jsonEncode(jsonList));
+      return true;
+    } catch (e) {
+      print('Error deleting bank transaction: $e');
+      return false;
+    }
+  }
+
+  // Utility Methods
   static Future<void> clearAllData() async {
-    if (_database == null) return;
-
-    await _database!.delete('dropdown_options');
-    await _database!.delete('expense_income_records');
-    await _database!.delete('bank_transactions');
-    await _database!.delete('category_names');
-    
-    // Re-insert default options
-    await _insertDefaultOptions();
+    try {
+      await _secureStorage.deleteAll();
+      print('All secure data cleared');
+    } catch (e) {
+      print('Error clearing all data: $e');
+    }
   }
 
-  // Close database
-  static Future<void> close() async {
-    if (_database != null) {
-      await _database!.close();
-      _database = null;
-    }
+  // Debug method to print all stored data
+  static Future<void> debugPrintData() async {
+    print("=== Secure Database Debug Info ===");
+    print("App Initialized: ${await isAppInitialized()}");
+    print("Jobs: ${await getJobs()}");
+    print("Accounts: ${await getAccounts()}");
+    print("Cash/Bank: ${await getCashBank()}");
+    print("Parties: ${await getParty()}");
+    
+    List<ExpenseIncomeRecord> expenseRecords = await getExpenseIncomeRecords();
+    print("Expense Records Count: ${expenseRecords.length}");
+    
+    List<BankTransaction> bankTransactions = await getBankTransactions();
+    print("Bank Transactions Count: ${bankTransactions.length}");
+    print("==================================");
   }
 }

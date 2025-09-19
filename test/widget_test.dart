@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(ExpenseManagementApp());
+  runApp(const ExpenseManagementApp());
 }
 
 class ExpenseManagementApp extends StatelessWidget {
-  const ExpenseManagementApp({Key? key}) : super(key: key);
+  const ExpenseManagementApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -178,7 +178,7 @@ class DataService {
 
 // Login Screen
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -316,7 +316,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
 // Main Screen with Bottom Navigation
 class MainScreen extends StatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
+  const MainScreen({super.key});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -381,7 +381,7 @@ class _MainScreenState extends State<MainScreen> {
 
 // Expense/Income Screen
 class ExpenseIncomeScreen extends StatefulWidget {
-  const ExpenseIncomeScreen({Key? key}) : super(key: key);
+  const ExpenseIncomeScreen({super.key});
 
   @override
   State<ExpenseIncomeScreen> createState() => _ExpenseIncomeScreenState();
@@ -517,7 +517,7 @@ class _ExpenseIncomeScreenState extends State<ExpenseIncomeScreen> {
 
 // Add Expense/Income Screen
 class AddExpenseIncomeScreen extends StatefulWidget {
-  const AddExpenseIncomeScreen({Key? key}) : super(key: key);
+  const AddExpenseIncomeScreen({super.key});
 
   @override
   State<AddExpenseIncomeScreen> createState() => _AddExpenseIncomeScreenState();
@@ -578,7 +578,7 @@ class _AddExpenseIncomeScreenState extends State<AddExpenseIncomeScreen> {
             child: Column(
               children: [
                 DropdownButtonFormField<String>(
-                  value: _selectedCashBank,
+                  initialValue: _selectedCashBank,
                   decoration: const InputDecoration(
                     labelText: 'CASH/BANK',
                     border: OutlineInputBorder(),
@@ -618,7 +618,7 @@ class _AddExpenseIncomeScreenState extends State<AddExpenseIncomeScreen> {
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
-                  value: _selectedJob,
+                  initialValue: _selectedJob,
                   decoration: const InputDecoration(
                     labelText: 'JOB',
                     border: OutlineInputBorder(),
@@ -693,7 +693,7 @@ class _AddExpenseIncomeScreenState extends State<AddExpenseIncomeScreen> {
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
-                  value: _selectedAccount,
+                  initialValue: _selectedAccount,
                   decoration: const InputDecoration(
                     labelText: 'ACCOUNT',
                     border: OutlineInputBorder(),
@@ -709,7 +709,7 @@ class _AddExpenseIncomeScreenState extends State<AddExpenseIncomeScreen> {
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
-                  value: _selectedStaffPersonalParty,
+                  initialValue: _selectedStaffPersonalParty,
                   decoration: const InputDecoration(
                     labelText: 'STAFF/PERSONAL-PARTY',
                     border: OutlineInputBorder(),
@@ -749,7 +749,7 @@ class _AddExpenseIncomeScreenState extends State<AddExpenseIncomeScreen> {
 
 // Bank Transaction Screen
 class BankTransactionScreen extends StatefulWidget {
-  const BankTransactionScreen({Key? key}) : super(key: key);
+  const BankTransactionScreen({super.key});
 
   @override
   State<BankTransactionScreen> createState() => _BankTransactionScreenState();
@@ -853,7 +853,7 @@ class _BankTransactionScreenState extends State<BankTransactionScreen> {
                     ),
                   ),
                 );
-              }).toList(),
+              }),
             ],
           ),
         ),
@@ -989,10 +989,10 @@ class AddBankTransactionScreen extends StatefulWidget {
   final double currentBalance;
 
   const AddBankTransactionScreen({
-    Key? key,
+    super.key,
     required this.selectedBank,
     required this.currentBalance,
-  }) : super(key: key);
+  });
 
   @override
   State<AddBankTransactionScreen> createState() => _AddBankTransactionScreenState();
@@ -1121,7 +1121,7 @@ class _AddBankTransactionScreenState extends State<AddBankTransactionScreen> {
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
-                  value: _selectedParty,
+                  initialValue: _selectedParty,
                   decoration: const InputDecoration(
                     labelText: 'Party',
                     border: OutlineInputBorder(),
@@ -1169,7 +1169,7 @@ class _AddBankTransactionScreenState extends State<AddBankTransactionScreen> {
 
 // Settings Screen
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({Key? key}) : super(key: key);
+  const SettingsScreen({super.key});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();

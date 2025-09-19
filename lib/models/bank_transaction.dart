@@ -1,13 +1,13 @@
 class BankTransaction {
-  final String id;
-  final DateTime date;
-  final String description;
-  final double credit;
-  final double debit;
-  final double netBalance;
-  final String party;
-  final String salaryLoanMonth;
-  final String bankName;
+  String id;
+  String date; // Keeping as String to match your existing structure
+  String description;
+  double credit;
+  double debit;
+  double netBalance;
+  String party;
+  String salaryLoanMonth;
+  String bankName; // Added bankName field
 
   BankTransaction({
     required this.id,
@@ -18,14 +18,14 @@ class BankTransaction {
     required this.netBalance,
     required this.party,
     required this.salaryLoanMonth,
-    required this.bankName,
+    required this.bankName, // Added bankName parameter
   });
 
-  // Convert to JSON
+  // Convert to JSON for storage
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'date': date.toIso8601String(),
+      'date': date,
       'description': description,
       'credit': credit,
       'debit': debit,
@@ -39,15 +39,38 @@ class BankTransaction {
   // Create from JSON
   factory BankTransaction.fromJson(Map<String, dynamic> json) {
     return BankTransaction(
-      id: json['id'],
-      date: DateTime.parse(json['date']),
-      description: json['description'],
-      credit: json['credit']?.toDouble() ?? 0.0,
-      debit: json['debit']?.toDouble() ?? 0.0,
-      netBalance: json['netBalance']?.toDouble() ?? 0.0,
-      party: json['party'],
-      salaryLoanMonth: json['salaryLoanMonth'],
-      bankName: json['bankName'],
+      id: json['id'] ?? '',
+      date: json['date'] ?? '',
+      description: json['description'] ?? '',
+      credit: (json['credit'] ?? 0.0).toDouble(),
+      debit: (json['debit'] ?? 0.0).toDouble(),
+      netBalance: (json['netBalance'] ?? 0.0).toDouble(),
+      party: json['party'] ?? '',
+      salaryLoanMonth: json['salaryLoanMonth'] ?? '',
+      bankName: json['bankName'] ?? '', // Handle bankName from JSON
     );
+  }
+
+  // Helper method to get date as DateTime object
+  DateTime get dateAsDateTime {
+    try {
+      // Try to parse the date string (assuming format: dd/MM/yyyy)
+      List<String> parts = date.split('/');
+      if (parts.length == 3) {
+        return DateTime(
+          int.parse(parts[2]), // year
+          int.parse(parts[1]), // month
+          int.parse(parts[0]), // day
+        );
+      }
+    } catch (e) {
+      print('Error parsing date: $e');
+    }
+    return DateTime.now(); // Fallback to current date
+  }
+
+  // Helper method to format date string
+  static String formatDate(DateTime dateTime) {
+    return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
   }
 }

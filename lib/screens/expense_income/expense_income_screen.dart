@@ -5,7 +5,7 @@ import '../login_screen.dart';
 import 'add_expense_income_screen.dart';
 
 class ExpenseIncomeScreen extends StatefulWidget {
-  const ExpenseIncomeScreen({Key? key}) : super(key: key);
+  const ExpenseIncomeScreen({super.key});
 
   @override
   State<ExpenseIncomeScreen> createState() => _ExpenseIncomeScreenState();
