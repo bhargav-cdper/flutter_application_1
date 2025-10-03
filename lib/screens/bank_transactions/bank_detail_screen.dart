@@ -67,7 +67,8 @@ class _BankDetailScreenState extends State<BankDetailScreen> {
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => AddBankTransactionScreen(selectedBank: widget.bankName),
+        // FIXED: Changed 'selectedBank' to 'bankName' to match the constructor parameter
+        builder: (context) => AddBankTransactionScreen(bankName: widget.bankName),
       ),
     );
 
